@@ -2,7 +2,8 @@ import numpy as np
 import normal_game
 import helper_func
 
-class Player():
+
+class Player:
     """
     Class that has player information.
 
@@ -36,14 +37,15 @@ class Player():
 
     def __init__(self, player, strategy=None):
         if self.game is not None:
-            self.initilize_player(player, strategy)
+            self.initialize_player(player, strategy)
         else:
-            raise normal_game.NotSetGameError("The game is not set")
+            raise normal_game.NotSetGameError()
 
-    def initilize_player(self, player, strategy):
+    def initialize_player(self, player, strategy):
         if player > self.game.num_players:
-            raise normal_game.ExceedNumPlayersError(f"Your input player exceeds the number of players in the given game. "
-                                                    f"The limit is {self.game.num_players}, but your input is {player}")
+            raise normal_game.ExceedNumPlayersError(
+                f"Your input player exceeds the number of players in the given game. "
+                f"The limit is {self.game.num_players}, but your input is {player}")
 
         self.player = player
         self.num_actions = self.game.num_strategies[self.player]
@@ -55,9 +57,9 @@ class Player():
         else:
             self.strategy = strategy
 
-    def init_game(cls, game_matrix):
+    def init_game(self, game_matrix):
         """initiate the normal game"""
-        cls.game.initialize_game(game_matrix)
+        self.game.initialize_game(game_matrix)
 
     def simulate_game(self, other_players):
         """
@@ -111,18 +113,22 @@ class Player():
         # If the cumulative regret is 0, his/her mixed strategy is uniformly random.
         mixed_strategy = np.copy(self.cum_regrets)
         mixed_strategy[mixed_strategy < 0] = 0
-        if (mixed_strategy.sum() <= 0):
+        if mixed_strategy.sum() <= 0:
+            # バランスよく割合を振り分ける
             mixed_strategy = np.tile(1.0 / self.num_actions, self.num_actions)
         else:
+            # regretに合わせて良い感じに割合をふり分ける
             mixed_strategy = mixed_strategy / mixed_strategy.sum()
         return mixed_strategy
 
     def _calc_regrets(self, played_actions):
         """Calculate the regret according to actions that are played."""
         regrets = []
+        # TODO: これ何しているの？なぜappendの関数をここに入れたの？
         add_regret = regrets.append
         helper_func.check_list_like(played_actions)
         base_utility = self.game.play_pure_strategy(played_actions)[self.player]
+        # これでregret比較できるのいいね。
         for action in range(self.num_actions):
             played_actions[self.player] = action
             regret = self.game.play_pure_strategy(played_actions)[self.player] - base_utility
@@ -135,6 +141,7 @@ class Player():
         regrets = self._calc_regrets(played_pure_strategies)
         # regrets[regrets < 0] = 0
         self.cum_regrets += regrets
+
 
 class NotPlayerError(Exception):
     def __init__(self, message):

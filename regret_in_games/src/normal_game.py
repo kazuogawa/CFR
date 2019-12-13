@@ -51,9 +51,10 @@ class OneShotGame:
     def __init__(self, game_matrix=None):
         if game_matrix is not None:
             self.initialize_game(game_matrix)
-        else:
-            self.game_matrix = None
-
+        # num_strategies is a np.ndarray. Its (i-1)th element is the number of strategies for player i.
+        self.game_matrix = np.array(game_matrix)
+        self.num_strategies = np.array(self.game_matrix.shape)[:-1]
+        self.num_players = len(self.num_strategies)
 
     def initialize_game(self, game_matrix):
         """
@@ -70,17 +71,13 @@ class OneShotGame:
         """
 
         helper_func.check_list_like(game_matrix)
-        self.game_matrix = np.array(game_matrix)
 
-        # num_strategies is a np.ndarray. Its (i-1)th element is the number of strategies for player i.
-        self.num_strategies = np.array(self.game_matrix.shape)[:-1]
-        self.num_players = len(self.num_strategies)
         return self
 
     def _check_valid_game(self):
         """Check the game is set or not. If not, raise `NotSetGameError`."""
         if self.game_matrix is None:
-            raise NotSetGameError("The game is not set.")
+            raise NotSetGameError()
 
     def play_prob(self, mixed_strategies):
         """
@@ -109,14 +106,18 @@ class OneShotGame:
         helper_func.check_list_like(mixed_strategies)
         mixed_strategies = np.array(mixed_strategies)
         if mixed_strategies.shape[0] > self.num_players:
-            raise ExceedNumPlayersError(f"Your input exceeds the number of players in the given matrix game. Expected: {self.num_players}. Yours: {mixed_strategies.shape[0]}")
+            raise ExceedNumPlayersError(
+                f"Your input exceeds the number of players in the given matrix game. Expected: {self.num_players}. Yours: {mixed_strategies.shape[0]}")
 
-        played_pure_strategies = [self._get_strategy(player, mix_strategy) for player, mix_strategy in enumerate(mixed_strategies)]
+        # playerごとのstrategyを入れて、決定した各actionをplayed_pure_strategiesに入れている
+        # TODO: chose_actionsでいい気がした
+        played_pure_strategies: list[int] = [self._get_strategy(player, mix_strategy) for player, mix_strategy in
+                                             enumerate(mixed_strategies)]
         resultant_utilities = self.play_pure_strategy(played_pure_strategies)
         return resultant_utilities, played_pure_strategies
 
-
-    def play_pure_strategy(self, pure_strategies):
+    # TODO: playにして、listを渡さずにforで繰り返しactionを渡せばよかった気がする
+    def play_pure_strategy(self, pure_strategies: object) -> object:
         """
         Play the game with given pure strategies.
 
@@ -135,17 +136,19 @@ class OneShotGame:
         pure_strategies = np.array(pure_strategies)
 
         if pure_strategies.shape[0] != self.num_strategies.shape[0]:
-            raise NotMatchNumStrategiesError(f"The given number of strategies is {pure_strategies.shape[0]}, but the required one is {self.num_strategies}.")
+            raise NotMatchNumStrategiesError(
+                f"The given number of strategies is {pure_strategies.shape[0]}, but the required one is {self.num_strategies}.")
 
         # check if the specified action does not exceed the number of actions in the given matrix game.
         if (self.num_strategies <= pure_strategies).any():
-            raise ExceedActionSpaceError(f"The action you specified exceeds the number of actions in the given matrix game.{pure_strategies[(self.num_strategies <= pure_strategies)]}")
+            raise ExceedActionSpaceError(
+                f"The action you specified exceeds the number of actions in the given matrix game.{pure_strategies[(self.num_strategies <= pure_strategies)]}")
         # tuple() is required.　https://stackoverflow.com/questions/5508352/indexing-numpy-array-with-another-numpy-array
         resultant_utilities = self.game_matrix[tuple(pure_strategies)]
         return resultant_utilities
 
-
-    def _get_strategy(self, player, mixed_strategy):
+    # TODO: get_actionでいい気がした
+    def _get_strategy(self, player, mixed_strategy) -> int:
         """
         Get an action drawn from the mixed strategy's distribution.
         """
@@ -153,20 +156,26 @@ class OneShotGame:
         helper_func.check_list_like(mixed_strategy)
         mixed_strategy = np.array(mixed_strategy)
         if not math.isclose(np.sum(mixed_strategy), 1.0):
-            raise NotDistError(f"Your mixed strategy is not a probability distribution because its sum is not 1, but {np.sum(mixed_strategy)}")
+            raise NotDistError(
+                f"Your mixed strategy is not a probability distribution because its sum is not 1, but {np.sum(mixed_strategy)}")
         if player > self.num_players:
-            raise ExceedNumPlayersError(f"Your input exceeds the number of players in the given matrix game. Expected: {self.num_players}. Yours: {player}")
+            raise ExceedNumPlayersError(
+                f"Your input exceeds the number of players in the given matrix game. Expected: {self.num_players}. Yours: {player}")
         if self.num_strategies[player - 1] != mixed_strategy.shape[0]:
-            raise NotMatchNumStrategiesError(f"The given number of strategies is {mixed_strategy.shape[0]}, but the required one is {self.num_strategies[player]}.")
-        
+            raise NotMatchNumStrategiesError(
+                f"The given number of strategies is {mixed_strategy.shape[0]}, but the required one is {self.num_strategies[player]}.")
+
         # choose an action according to the given mixed stratgy
+        # randomで出力された数値が一番近い戦略を実行する
         chose_action = np.searchsorted(mixed_strategy.cumsum(), np.random.uniform())
         return chose_action
+
 
 class NotMatchNumStrategiesError(Exception):
     """
     Raise when you tried to play, the required number of strategies is not equal to that of strategies you gave. 
     """
+
     def __init__(self, message):
         self.message = message
 
@@ -175,6 +184,7 @@ class ExceedActionSpaceError(Exception):
     """
     Raise when you tried to specify a certain action, but the number exceeds the possible number of actions.
     """
+
     def __init__(self, message):
         self.message = message
 
@@ -183,6 +193,7 @@ class NotDistError(Exception):
     """
     Raise when the sum of your probability distribution is not 1.
     """
+
     def __init__(self, message):
         self.message = message
 
@@ -191,6 +202,7 @@ class ExceedNumPlayersError(Exception):
     """
     Raise when you manipulate player which exceeds the number of players in a given matrix game
     """
+
     def __init__(self, message):
         self.message = message
 
@@ -199,5 +211,6 @@ class NotSetGameError(Exception):
     """
     raise when the game is None, that is, the game is not set.
     """
+
     def __init__(self):
         self.message = "The game is not set!"
